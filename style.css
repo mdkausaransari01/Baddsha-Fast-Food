@@ -2263,3 +2263,13 @@ textarea {
     animation: none !important;
   }
 }
+
+@media (max-width: 768px) {
+  .hero-bg-grid {
+    background-image: 
+      linear-gradient(180deg, rgba(14,9,6,0.75), rgba(14,9,6,0.85)),
+      url("mobile-banner.jpg"); /* Mobile-optimized image */
+    background-position: center;
+    background-size: cover;
+  }
+}
