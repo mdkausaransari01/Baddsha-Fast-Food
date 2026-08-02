@@ -1,6 +1,7 @@
 /* ================================================================
    BADDSHA FAST FOOD — COMPLETE SCRIPT.JS (FULLY FIXED)
-   Features: EmailJS, Order Form, Navigation, Animations, Toast
+   Features: EmailJS, Order Form, Navigation, Animations, Toast,
+             Sticky Mobile Order Bar
    FIXED: items_html instead of items_list for EmailJS
 =============================================================== */
 
@@ -121,6 +122,26 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('📍 Location: Phulwari Sharif, Patna, Bihar');
 
     // ============================================================
+    // CALL LINKS — mobile only, desktop shows popup message
+    // ============================================================
+    (function initCallLinkGuard() {
+        const callLinks = document.querySelectorAll('a[href^="tel:"]');
+
+        const isMobileDevice = () => {
+            return window.matchMedia('(max-width: 768px)').matches;
+        };
+
+        callLinks.forEach((link) => {
+            link.addEventListener('click', (e) => {
+                if (isMobileDevice()) return;
+
+                e.preventDefault();
+                window.alert('Calls are available only on mobile devices. Please open this site on your phone to place a call.');
+            });
+        });
+    })();
+
+    // ============================================================
     // NAVBAR — Sticky / Scroll Behavior
     // ============================================================
     (function initNavbar() {
@@ -147,6 +168,7 @@ document.addEventListener('DOMContentLoaded', function() {
     (function initHamburger() {
         const toggle = document.getElementById('menuToggle');
         const navLinks = document.getElementById('navLinks');
+        const overlay = document.getElementById('navOverlay');
 
         if (!toggle || !navLinks) return;
 
@@ -156,6 +178,9 @@ document.addEventListener('DOMContentLoaded', function() {
             navLinks.classList.toggle('open', isOpen);
             toggle.classList.toggle('open', isOpen);
             toggle.setAttribute('aria-expanded', isOpen.toString());
+            if (overlay) {
+                overlay.classList.toggle('open', isOpen);
+            }
             
             if (isOpen) {
                 document.body.style.overflow = 'hidden';
@@ -172,6 +197,10 @@ document.addEventListener('DOMContentLoaded', function() {
         navLinks.querySelectorAll('a').forEach(link => {
             link.addEventListener('click', () => toggleMenu(false));
         });
+
+        if (overlay) {
+            overlay.addEventListener('click', () => toggleMenu(false));
+        }
 
         document.addEventListener('click', (e) => {
             if (navLinks.classList.contains('open')) {
@@ -198,7 +227,9 @@ document.addEventListener('DOMContentLoaded', function() {
     })();
 
     // ============================================================
-    // SMOOTH SCROLL — All anchor links
+    // SMOOTH SCROLL — All anchor links (covers hero "Order Now",
+    // the big Quick-Order CTA button, nav links, and card "Order"
+    // buttons — every one of them points to #query)
     // ============================================================
     (function initSmoothScroll() {
         document.querySelectorAll('a[href^="#"]').forEach(anchor => {
@@ -260,6 +291,7 @@ document.addEventListener('DOMContentLoaded', function() {
             '.section-label',
             '.section-title',
             '.section-subtitle',
+            '.qoc-inner',
         ];
 
         targets.forEach(selector => {
@@ -371,6 +403,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const selectedCount = document.getElementById('selectedCount');
     const clearAllBtn = document.getElementById('clearAll');
 
+    // Sticky mobile order bar elements
+    const stickyBar = document.getElementById('stickyOrderBar');
+    const sobCount = document.getElementById('sobCount');
+    const sobTotal = document.getElementById('sobTotal');
+    const sobBtn = document.getElementById('sobBtn');
+
     if (!form) {
         console.warn('⚠️ Order form not found on this page');
         return;
@@ -383,7 +421,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const checkbox = header.querySelector('.item-check');
         if (checkbox) {
             checkbox.checked = !checkbox.checked;
-            checkbox.dispatchEvent(new Event('change'));
+            checkbox.dispatchEvent(new Event('change', { bubbles: true }));
         }
     };
 
@@ -405,7 +443,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         radio.checked = true;
         label.classList.add('selected');
-        radio.dispatchEvent(new Event('change'));
+        radio.dispatchEvent(new Event('change', { bubbles: true }));
     };
 
     // ============================================================
@@ -466,7 +504,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // ============================================================
-    // UPDATE SUMMARY
+    // UPDATE SUMMARY (also drives the sticky mobile order bar)
     // ============================================================
     function updateSummary() {
         const checkedItems = document.querySelectorAll('.item-check:checked');
@@ -474,6 +512,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (checkedItems.length === 0) {
             if (orderSummary) orderSummary.style.display = 'none';
+            updateStickyBar(0, 0);
             return;
         }
 
@@ -518,9 +557,45 @@ document.addEventListener('DOMContentLoaded', function() {
                 const checkbox = document.querySelector(`.item-check[value="${itemName}"]`);
                 if (checkbox) {
                     checkbox.checked = false;
-                    checkbox.dispatchEvent(new Event('change'));
+                    checkbox.dispatchEvent(new Event('change', { bubbles: true }));
                 }
             });
+        });
+
+        updateStickyBar(totalQty, total);
+    }
+
+    // ============================================================
+    // STICKY MOBILE ORDER BAR — show/hide + live totals
+    // ============================================================
+    function updateStickyBar(qty, total) {
+        if (!stickyBar) return;
+
+        if (sobCount) sobCount.textContent = `${qty} item${qty === 1 ? '' : 's'}`;
+        if (sobTotal) sobTotal.textContent = `₹${total}`;
+
+        const shouldShow = qty > 0 && window.matchMedia('(max-width: 768px)').matches;
+        stickyBar.classList.toggle('show', shouldShow);
+        document.body.classList.toggle('has-sticky-bar', shouldShow);
+    }
+
+    // Re-evaluate sticky bar visibility on resize (e.g. rotate phone)
+    window.addEventListener('resize', () => {
+        const qtyText = totalItemsCount ? totalItemsCount.textContent : '0';
+        const totalText = estimatedTotal ? estimatedTotal.textContent.replace(/[^\d]/g, '') : '0';
+        updateStickyBar(parseInt(qtyText) || 0, parseInt(totalText) || 0);
+    });
+
+    // Tapping the sticky bar jumps straight to the order summary /
+    // submit button inside the form so the user can review & confirm.
+    if (sobBtn) {
+        sobBtn.addEventListener('click', () => {
+            const jumpTarget = orderSummary && orderSummary.style.display !== 'none'
+                ? orderSummary
+                : (submitBtn || form);
+            const navHeight = document.getElementById('site-header')?.offsetHeight || 80;
+            const targetPosition = jumpTarget.getBoundingClientRect().top + window.pageYOffset - navHeight - 12;
+            window.scrollTo({ top: targetPosition, behavior: 'smooth' });
         });
     }
 
@@ -531,7 +606,7 @@ document.addEventListener('DOMContentLoaded', function() {
         clearAllBtn.addEventListener('click', function() {
             document.querySelectorAll('.item-check:checked').forEach(cb => {
                 cb.checked = false;
-                cb.dispatchEvent(new Event('change'));
+                cb.dispatchEvent(new Event('change', { bubbles: true }));
             });
             if (orderSummary) orderSummary.style.display = 'none';
         });
@@ -667,6 +742,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (orderSummary) orderSummary.style.display = 'none';
                     if (selectedCount) selectedCount.textContent = '0';
                     if (formSuccess) formSuccess.style.display = 'none';
+                    updateStickyBar(0, 0);
                 }, 5000);
             })
             .catch(function(error) {
@@ -732,23 +808,27 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // ============================================================
-    // ORDER BUTTONS — Quick order from cards
+    // ORDER BUTTONS — Quick order from cards & the big homepage CTA
     // ============================================================
     (function initOrderButtons() {
         document.querySelectorAll('.card-order').forEach(button => {
-            button.addEventListener('click', (e) => {
-                e.preventDefault();
+            button.addEventListener('click', () => {
                 const card = button.closest('.service-card');
                 const itemName = card?.querySelector('.card-title')?.textContent || 'item';
-                
-                const formSection = document.getElementById('query');
-                if (formSection) {
-                    formSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
-                
                 showToast(`Ready to order ${itemName}? Fill the form below!`);
             });
         });
+
+        const quickOrderBtn = document.getElementById('quickOrderBtn');
+        if (quickOrderBtn) {
+            quickOrderBtn.addEventListener('click', () => {
+                // Smooth scroll already handled by initSmoothScroll(); just
+                // draw the eye to the name field once the scroll settles.
+                setTimeout(() => {
+                    document.getElementById('name')?.focus({ preventScroll: true });
+                }, 650);
+            });
+        }
     })();
 
     // ============================================================
@@ -765,6 +845,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 formError.hidden = true;
                 formError.style.display = 'none';
             }
+            updateStickyBar(0, 0);
         });
     })();
 
